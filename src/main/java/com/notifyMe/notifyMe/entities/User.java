@@ -25,7 +25,7 @@ public class User {
     //If cascade is not present then ,movie entity must be saved first and then the user entity must be saved.
     @ManyToMany(cascade =CascadeType.ALL)
     @JoinTable(
-            name = "userMovieMapping",
+            name = "users_movies_mapping",
             joinColumns = @JoinColumn(name = "userId"),
             inverseJoinColumns = @JoinColumn(name = "movieId")
     )

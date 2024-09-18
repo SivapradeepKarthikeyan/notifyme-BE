@@ -7,4 +7,7 @@ public class Constants {
     public static String MOVIE_ADDED_SUCCESS="Movie add to user successfully";
     public static String MOVIE_CONFLICT="Already user mapped with this movie";
     public static String ERROR_CONNECTING_DB="Error in connection with DB";
+    public static String PAGINATION_FAILED="Pagination Failed";
+    public static String PAGINATION_SUCCESS="Pagination success";
+
 }
