@@ -12,6 +12,6 @@ import java.util.Objects;
 public class NotifyMeResponse {
     String status;
     String message;
-    int status_code;
+    int statusCode;
     Object data;
 }

@@ -1,6 +1,7 @@
 package com.notifyMe.notifyMe.services;
 
-import com.notifyMe.notifyMe.DTOs.UserDTO;
+import com.notifyMe.notifyMe.DTOs.UpComingMovieDTO;
+import com.notifyMe.notifyMe.DTOs.UserMovieDTO;
 import com.notifyMe.notifyMe.entities.Movie;
 import com.notifyMe.notifyMe.entities.UpComingMovie;
 import com.notifyMe.notifyMe.entities.User;
@@ -8,86 +9,106 @@ import com.notifyMe.notifyMe.repositories.MovieRepository;
 import com.notifyMe.notifyMe.repositories.UpComingMovieRepository;
 import com.notifyMe.notifyMe.repositories.UserRepository;
 import com.notifyMe.notifyMe.responses.NotifyMeResponse;
-import jakarta.transaction.Transactional;
+import jdk.jfr.Name;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
-import org.springframework.data.domain.Sort;
+import org.hibernate.context.*;
 
-
-import java.util.HashSet;
-import java.util.Set;
+import java.util.*;
 
 import static com.notifyMe.notifyMe.constants.Constants.*;
 
 @Service
-@Transactional
 public class MovieService {
-
     @Autowired
     UserRepository userRepository;
+
     @Autowired
     MovieRepository movieRepository;
+
     @Autowired
     UpComingMovieRepository upComingMovieRepository;
 
     //Logger
     Logger logger = LoggerFactory.getLogger(MovieService.class);
 
-    public NotifyMeResponse addMovieToUser(UserDTO userDTO) {
-        logger.info("Movie DTO :: " + userDTO.toString());
+    @Name("To add all upcoming movies to DB")
+    public NotifyMeResponse addUpComingMovies(List<UpComingMovieDTO> upComingMovieDTOList) {
         try {
-            User user=new User();
-            user.setUserId(userDTO.getUserId());
-            user.setUserName(userDTO.getUserName());
-            user.setUserNotificationTypes(user.getUserNotificationTypes());
+            for (UpComingMovieDTO upComingMovieDTO : upComingMovieDTOList) {
 
-            Movie movie=new Movie();
-            movie.setMovieId(userDTO.getUserMovieId());
-            movie.setMovieName(userDTO.getUserMovieName());
-            movie.setMovieUrl(userDTO.getUserMovieUrl());
+                UpComingMovie upComingMovie = new UpComingMovie();
+                upComingMovie.setMovieId(upComingMovieDTO.getMovieId());
+                upComingMovie.setMovieName(upComingMovieDTO.getMovieName());
+                upComingMovie.setMoviePosterUrl(upComingMovieDTO.getMoviePosterUrl());
+                upComingMovie.setMovieLanguage(upComingMovieDTO.getMovieLanguage());
+                upComingMovie.setMovieGenre(upComingMovieDTO.getMovieGenre());
+                upComingMovie.setMovieReleaseDate(upComingMovieDTO.getMovieReleaseDate());
+                upComingMovie.setMovieLanguageGroup(upComingMovieDTO.getMovieLanguageGroup());
 
-            Set<Movie> movies=new HashSet<>();
-            movies.add(movie);
-            user.setMovie(movies);
-            logger.warn("User entity to be saved :: "+user.toString());
-            logger.warn("before saving ::");
+                upComingMovieRepository.save(upComingMovie);
+            }
+            return new NotifyMeResponse(SUCCESS, UPCOMING_MOVIES_ADD_SUCCESS, 200, null);
+        } catch (Exception e) {
+//            logger.warn(e.getMessage());
+            return new NotifyMeResponse(FAILED, UPCOMING_MOVIES_ADD_FAILED, 500, null);
+        }
+    }
+
+    @Name("To add a movie to user")
+    public NotifyMeResponse addMovieToUser(UserMovieDTO userMovieDTO) {
+
+        if (isMovieAlreadyRegistered(userMovieDTO))
+            return new NotifyMeResponse(FAILED, MOVIE_ALREADY_REGISTERED, 409, null);
+
+        try {
+            User user = userRepository.findByUserId(userMovieDTO.getUserId()).orElse(new User());
+            user.setUserId(userMovieDTO.getUserId());
+            user.setUserName(userMovieDTO.getUserName());
+            user.setUserNotificationTypes(userMovieDTO.getUserNotificationTypes());
+
+            Movie movie = new Movie();
+            movie.setMovieId(userMovieDTO.getUserMovieId());
+            movie.setMovieName(userMovieDTO.getUserMovieName());
+            movie.setMovieUrl(userMovieDTO.getUserMovieUrl());
+            List<Movie> userMovies = Objects.isNull(user.getMovie()) ? new ArrayList<>() : new ArrayList<>(user.getMovie());
+            userMovies.add(movie);
+            user.setMovie(userMovies);
+
             userRepository.save(user);
 
-            return new NotifyMeResponse(SUCCESS, MOVIE_ADDED_SUCCESS, 200, userDTO);
+            return new NotifyMeResponse(SUCCESS, MOVIE_ADDED_SUCCESS, 200, userMovieDTO);
         } catch (Exception e) {
             return new NotifyMeResponse(FAILED, e.getMessage(), 500, null);
         }
     }
 
-    public NotifyMeResponse getMoviesByReleaseDate(int start, int end) {
-        Pageable pageRequest = PageRequest.of(start, end, Sort.by("movieReleaseDate").ascending());
-        Page<UpComingMovie> page = upComingMovieRepository.findAll(pageRequest);
-        if (page.isEmpty())
-            return new NotifyMeResponse(FAILED, PAGINATION_FAILED, 500, null);
-        return new NotifyMeResponse(SUCCESS, PAGINATION_SUCCESS, 200, page);
-    }
-
-    public NotifyMeResponse getMoviesByLanguage(String language, int start, int end) {
-        Pageable pageRequest = PageRequest.of(start, end);
-        Page<UpComingMovie> page = upComingMovieRepository.findByLanguage(language,pageRequest);
-        if (page.isEmpty())
-            return new NotifyMeResponse(FAILED, PAGINATION_FAILED, 500, null);
-        return new NotifyMeResponse(SUCCESS, PAGINATION_SUCCESS, 200, page);
-    }
-
-
-    public NotifyMeResponse getMoviesByLanguageAndGenre(String language, String genre, int start, int end) {
-        Pageable pageRequest = PageRequest.of(start, end);
-        Page<UpComingMovie> page = upComingMovieRepository.findByLanguageAndGenre(language, genre, pageRequest);
-        if (page.isEmpty())
-            return new NotifyMeResponse(FAILED, PAGINATION_FAILED, 500, null);
-        return new NotifyMeResponse(SUCCESS, PAGINATION_SUCCESS, 200, page);
+    boolean isMovieAlreadyRegistered(UserMovieDTO userMovieDTO) {
+        logger.warn("IS ALREADY REGISTERED CHECK :: ");
+        Optional<User> optionalUser = userRepository.findByUserId(userMovieDTO.getUserId());
+        logger.warn("OP USER :: " + optionalUser);
+        optionalUser.ifPresent(user -> System.out.println("IS ALREADY REGISTERED :: " + optionalUser));
+        if (optionalUser.isPresent()) {
+            Optional<Movie> movie = optionalUser.get().getMovie().stream()
+                    .filter(m -> m.getMovieId().equals(userMovieDTO.getUserMovieId()))
+                    .findFirst();
+            return movie.isPresent();
+        }
+        return false;
     }
 
 
+    @Name("To get all users")
+    public NotifyMeResponse getAllUsers() {
+        List<User> users = userRepository.findAll();
+        return new NotifyMeResponse(SUCCESS, MOVIES_FETCH_SUCCESS, 200, users);
+    }
+
+    @Name("To get all movies")
+    public NotifyMeResponse getAllMovies() {
+        List<Movie> movies = movieRepository.findAll();
+        return new NotifyMeResponse(SUCCESS, MOVIES_FETCH_SUCCESS, 200, movies);
+    }
 }

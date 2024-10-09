@@ -11,7 +11,7 @@ import java.util.HashMap;
 @AllArgsConstructor
 @NoArgsConstructor
 @ToString
-public class UserDTO {
+public class UserMovieDTO {
     String userId;
     String userName;
     HashMap<String,String> userNotificationTypes;
